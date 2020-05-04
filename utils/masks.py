@@ -1,3 +1,6 @@
+from torch import from_numpy
+from numpy import triu, ones
+
 def subsequent_mask(size):
     "Mask out subsequent positions."
     attn_shape = (1, size, size)
