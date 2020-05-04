@@ -1,13 +1,13 @@
 from torch.nn import Module
-from utils import clones
-from LayerNorm_def import LayerNorm
+from utils.misc import clones
+from model.LayerNorm_def import LayerNorm
 
 
-class TransformerDecoder(Module):
+class Decoder(Module):
     "Generic N layer decoder with masking."
 
     def __init__(self, layer, N):
-        super(TransformerDecoder, self).__init__()
+        super(Decoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 

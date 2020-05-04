@@ -1,13 +1,13 @@
 from torch.nn import Module
-from LayerNorm_def import LayerNorm
-from utils import clones
+from model.LayerNorm_def import LayerNorm
+from utils.misc import clones
 
 
-class TransformerEncoder(Module):
+class Encoder(Module):
     "Core encoder is a stack of N layers"
 
     def __init__(self, layer, N):
-        super(TransformerEncoder, self).__init__()
+        super(Encoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 

@@ -3,7 +3,7 @@ from math import sqrt
 import torch.nn.functional as F
 
 
-def attention(query, key, value, mask=None, dropout=None):
+def dot_product_attention(query, key, value, mask=None, dropout=None):
     "Compute 'Scaled Dot Product Attention'"
     d_k = query.size(-1)
     scores = matmul(query, key.transpose(-2, -1)) / sqrt(d_k)

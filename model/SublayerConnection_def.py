@@ -1,4 +1,4 @@
-from LayerNorm_def import LayerNorm
+from model.LayerNorm_def import LayerNorm
 from torch.nn import Module, Dropout
 
 

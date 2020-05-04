@@ -1,13 +1,13 @@
 from torch.nn import Module
-from utils import clones
-from SublayerConnection_def import SublayerConnection
+from utils.misc import clones
+from model.SublayerConnection_def import SublayerConnection
 
 
-class TransformerDecoderLayer(Module):
+class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
 
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
-        super(TransformerDecoderLayer, self).__init__()
+        super(DecoderLayer, self).__init__()
         self.size = size
         self.self_attn = self_attn
         self.src_attn = src_attn
