@@ -1,9 +1,11 @@
 from torch.nn import Module
-from models.transformer.utils import clones
-from models.transformer.SublayerConnection_def import SublayerConnection
+from utils import clones
+from SublayerConnection_def import SublayerConnection
+
 
 class TransformerEncoderLayer(Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
+
     def __init__(self, size, self_attn, feed_forward, dropout):
         super(TransformerEncoderLayer, self).__init__()
         self.self_attn = self_attn

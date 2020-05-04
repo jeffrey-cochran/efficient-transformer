@@ -1,8 +1,10 @@
 from torch.nn import Module, Parameter
 from torch import ones, zeros
 
+
 class LayerNorm(Module):
     "Construct a layernorm module (See citation for details)."
+
     def __init__(self, features, eps=1e-6):
         super(LayerNorm, self).__init__()
         self.a_2 = Parameter(ones(features))

@@ -1,6 +1,7 @@
 from torch.nn import Module, Embedding
 from math import sqrt
 
+
 class Embeddings(Module):
     def __init__(self, d_model, vocab):
         super(Embeddings, self).__init__()

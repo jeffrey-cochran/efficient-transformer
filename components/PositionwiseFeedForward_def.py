@@ -1,8 +1,10 @@
 from torch.nn import Module, Linear, Dropout
 import torch.nn.functional as F
 
+
 class PositionwiseFeedForward(Module):
     "Implements FFN equation."
+
     def __init__(self, d_model, d_ff, dropout=0.1):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = Linear(d_model, d_ff)
