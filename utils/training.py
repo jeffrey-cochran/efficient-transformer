@@ -1,5 +1,9 @@
 import time
+from torch import from_numpy
+from numpy.random import randint
 from torch.optim import Adam
+from torch.autograd import Variable
+from utils.Batch_def import Batch
 
 
 def run_epoch(data_iter, model, loss_compute):
@@ -78,3 +82,12 @@ def get_std_opt(model):
         4000,
         Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
     )
+
+def data_gen(V, batch, nbatches):
+    "Generate random data for a src-tgt copy task."
+    for i in range(nbatches):
+        data = from_numpy(randint(1, V, size=(batch, 10)))
+        data[:, 0] = 1
+        src = Variable(data, requires_grad=False)
+        tgt = Variable(data, requires_grad=False)
+        yield Batch(src, tgt, 0)

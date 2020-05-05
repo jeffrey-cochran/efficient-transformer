@@ -19,3 +19,5 @@ for epoch in range(10):
     run_epoch(data_gen(V, 30, 20), model, Loss(model.generator, criterion, model_opt))
     model.eval()
     print(run_epoch(data_gen(V, 30, 5), model, Loss(model.generator, criterion, None)))
+
+

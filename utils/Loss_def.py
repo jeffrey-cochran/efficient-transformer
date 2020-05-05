@@ -22,4 +22,5 @@ class Loss:
         if self.opt is not None:
             self.opt.step()
             self.opt.optimizer.zero_grad()
-        return loss.data[0] * norm
+        print(loss.data)
+        return loss.data.item() * norm
