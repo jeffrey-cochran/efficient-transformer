@@ -7,7 +7,12 @@ from torch.optim import Adam
 V = 11
 criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
 model = make_model(V, V, N=2)
-model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400, Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+model_opt = NoamOpt(
+    model.src_embed[0].d_model,
+    1,
+    400,
+    Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+)
 
 for epoch in range(10):
     model.train()
