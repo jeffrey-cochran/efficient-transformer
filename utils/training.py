@@ -83,6 +83,7 @@ def get_std_opt(model):
         Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
     )
 
+
 def data_gen(V, batch, nbatches):
     "Generate random data for a src-tgt copy task."
     for i in range(nbatches):
