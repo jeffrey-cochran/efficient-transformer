@@ -1,0 +1,33 @@
+# 
+# Clerical configs
+input_json_file_name: data/cocotalk.json
+input_label_h5_file_name: data/cocotalk_label.h5
+input_att_dir: data/cocobu_att
+
+#
+# Optimization configs
+noamopt: true
+noamopt_warmup: 20000
+sequences_per_img: 5
+batch_size: 10
+learning_rate: 0.0005
+
+#
+# Transformer configs
+label_smoothing: 0.0
+N_enc: 6
+N_dec: 6
+d_model: 512
+d_ff: 2048
+num_att_heads: 8
+dropout: 0.1
+
+#
+# Training configs
+learning_rate_decay_start: 0
+scheduled_sampling_start: -1 
+save_checkpoint_every: 3000
+language_eval: 1
+val_images_use: 5000
+max_epochs: 15
+train_sample_n: 5

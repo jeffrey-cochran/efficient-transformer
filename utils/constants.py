@@ -1,0 +1,5 @@
+checkpoint_path = ""
+input_fc_dir = ""
+input_att_dir = ""
+input_box_dir = ""
+input_label_h5 = ""
