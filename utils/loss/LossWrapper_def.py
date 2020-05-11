@@ -75,11 +75,11 @@ class LossWrapper(Module):
             if self.structure_loss_weight > 0:
                 #
                 # NOTE: this is not a model.forward() method. In original code,
-                # _sample and _forward were both hidden within model.forward(). 
+                # _sample and _forward were both hidden within model.forward().
                 # Unclear if pytorch needs that for gradient computation here.
                 # I think it may not, since this is just used to compute a second
                 # loss. I'm wondering if this isn't just a duplication of effort.
-                # In other words, if the code were refactored, you may be able to 
+                # In other words, if the code were refactored, you may be able to
                 # use the output of self.crit() above for sampling and computing the
                 # lm_loss
                 gen_result, sample_logprobs = self.model.sample(
@@ -89,11 +89,11 @@ class LossWrapper(Module):
                     sample_method=self.train_sample_method,
                     beam_size=self.train_beam_size,
                     output_logsoftmax=(
-                        self.struc_use_logsoftmax 
+                        self.struc_use_logsoftmax
                         or self.structure_loss_type == SOFTMAX
                         or not (MARGIN_KEYWORD in self.structure_loss_type)
-                       ),
-                    sample_n=self.train_sample_n
+                    ),
+                    sample_n=self.train_sample_n,
                 )
                 gts = [gts[_] for _ in gt_indices.tolist()]
                 struc_loss = self.struc_crit(sample_logprobs, gen_result, gts)
@@ -117,7 +117,7 @@ class LossWrapper(Module):
         elif not sc_flag:
             #
             # When not self-critical, it's just calling normal forward().
-            # This is, in effect, guaranteeing that LossWrapper does not 
+            # This is, in effect, guaranteeing that LossWrapper does not
             # affect the ability of model.forward() to train as it would
             # normally. NOTE: This is just the language model loss
             loss = self.crit(

@@ -32,6 +32,32 @@ try:
 except:
     print("Warning: coco-caption not available")
 
+#
+# Input: seq, N*D numpy array, with element 0 .. vocab_size. 0 is END token.
+def decode_sequence(ix_to_word, seq):
+    N, D = seq.size()
+    out = []
+    for i in range(N):
+        txt = ""
+        for j in range(D):
+            ix = seq[i, j]
+            if ix > 0:
+                if j >= 1:
+                    txt = txt + " "
+                txt = txt + ix_to_word[str(ix.item())]
+            else:
+                break
+        if int(os.getenv("REMOVE_BAD_ENDINGS", "0")):
+            flag = 0
+            words = txt.split(" ")
+            for j in range(len(words)):
+                if words[-j - 1] not in bad_endings:
+                    flag = -j
+                    break
+            txt = " ".join(words[0 : len(words) + flag])
+        out.append(txt.replace("@@ ", ""))
+    return out
+
 
 #
 # Detremine how many sentences end with an inappropriate word.
@@ -42,6 +68,7 @@ def count_bad(sen):
         return 1
     else:
         return 0
+
 
 #
 # Load annotation file
@@ -198,12 +225,15 @@ def eval_split(
     n_predictions = []  # when sample_n > 1
     while True:
         #
-        # ???
+        # len(data[]) is batch size
         data = loader.get_batch(split)
         n = n + len(data["infos"])
 
+        #
+        # If data is labeled and writing loss verbosely
         if data.get("labels", None) is not None and verbose_loss:
-            # forward the model to get loss
+            #
+            # Load into gpu memory, parallelize
             tmp = [
                 data["fc_feats"],
                 data["att_feats"],
@@ -214,6 +244,8 @@ def eval_split(
             tmp = [_.cuda() if _ is not None else _ for _ in tmp]
             fc_feats, att_feats, labels, masks, att_masks = tmp
 
+            #
+            # Compute average loss
             with torch.no_grad():
                 loss = crit(
                     model(fc_feats, att_feats, labels, att_masks),
@@ -224,15 +256,21 @@ def eval_split(
             loss_evals = loss_evals + 1
 
         #
-        # forward the model to also get generated samples for each image
-        # Only leave one feature for each image, in case duplicate sample
+        # Make sure cuda() is called if previous if(condition) failed
         tmp = [data["fc_feats"], data["att_feats"], data["att_masks"]]
         tmp = [_.cuda() if _ is not None else _ for _ in tmp]
         fc_feats, att_feats, att_masks = tmp
-        with torch.no_grad():
 
-            seq, seq_logprobs = model(fc_feats, att_feats, att_masks, mode="sample")
+        #
+        # Only leave one feature for each image, in case duplicate sample
+        with torch.no_grad():
+            #
+            # Generate sequence with current model
+            seq, seq_logprobs = model.sample(fc_feats, att_feats, att_masks)
             seq = seq.data
+
+            #
+            # Compute entropy and perplexity of generated sequence
             entropy = -(F.softmax(seq_logprobs, dim=2) * seq_logprobs).sum(2).sum(1) / (
                 (seq > 0).float().sum(1) + 1
             )
@@ -240,6 +278,7 @@ def eval_split(
                 (seq > 0).float().sum(1) + 1
             )
 
+        #
         # Print beam search
         if beam_size > 1 and verbose_beam:
             for i in range(fc_feats.shape[0]):

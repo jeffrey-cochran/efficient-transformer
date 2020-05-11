@@ -16,7 +16,7 @@ class CustomSampler(data.sampler.Sampler):
         return self
 
     def __next__(self):
-        
+
         wrapped = False
 
         #
@@ -30,7 +30,8 @@ class CustomSampler(data.sampler.Sampler):
             else:
                 raise StopIteration()
         #
-        # elem = ( [batch_indices,], current_iteration, has_wrapped )
+        # NOTE: if(self.shuffle) ==> index is random
+        # elem = ( index, current_iteration, has_wrapped )
         elem = (self._index_list[self.iter_counter], self.iter_counter + 1, wrapped)
         #
         self.iter_counter += 1
@@ -57,12 +58,19 @@ class CustomSampler(data.sampler.Sampler):
         return len(self.index_list)
 
     def load_state_dict(self, state_dict=None):
+        #
+        # Why???
         if state_dict is None:
             return
+        #
+        # State is characterzized by just these two things
+        # list of (random) indices and the current iteration
         self._index_list = state_dict["index_list"]
         self.iter_counter = state_dict["iter_counter"]
 
     def state_dict(self, prefetched_num=None):
+        #
+        # Prefetched num indicates how many have already been sampled?
         prefetched_num = prefetched_num or 0
         return {
             "index_list": self._index_list,

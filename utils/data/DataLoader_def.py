@@ -1,4 +1,4 @@
-from torch.utils import data
+from torch.utils.data import DataLoader as torch_DataLoader
 
 from utils.data.Dataset_def import Dataset
 from utils.data.CustomSampler_def import CustomSampler
@@ -43,9 +43,12 @@ class DataLoader:
                     self.dataset.split_ix[split], shuffle=False, wrap=False
                 )
             #
+            # NOTE: the DataLoader class contained in self.loaders[] is
+            # pytorch's implementation.
+            #
             # Generate dictionary of DataLoaders for each
-            # split of the data set
-            self.loaders[split] = data.DataLoader(
+            # split of the data set.
+            self.loaders[split] = torch_DataLoader(
                 dataset=self.dataset,
                 batch_size=self.batch_size,
                 sampler=sampler,
@@ -62,6 +65,8 @@ class DataLoader:
         try:
             data = next(self.iters[split])
         except StopIteration:
+            #
+            # Reinitialize iterator
             self.iters[split] = iter(self.loaders[split])
             data = next(self.iters[split])
         return data
@@ -108,6 +113,6 @@ class DataLoader:
         if state_dict is None:
             return
         #
-        # 
+        #
         for split in self.loaders.keys():
             self.loaders[split].sampler.load_state_dict(state_dict[split])
