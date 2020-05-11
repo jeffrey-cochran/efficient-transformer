@@ -32,6 +32,8 @@ class DataLoader:
         # Initialize loaders and iters
         self.loaders, self.iters = {}, {}
         for split in ["train", "val", "test"]:
+            #
+            # Shuffle data for training
             if split == "train":
                 sampler = CustomSampler(
                     self.dataset.split_ix[split], shuffle=True, wrap=True
@@ -40,6 +42,9 @@ class DataLoader:
                 sampler = CustomSampler(
                     self.dataset.split_ix[split], shuffle=False, wrap=False
                 )
+            #
+            # Generate dictionary of DataLoaders for each
+            # split of the data set
             self.loaders[split] = data.DataLoader(
                 dataset=self.dataset,
                 batch_size=self.batch_size,
@@ -49,6 +54,8 @@ class DataLoader:
                 collate_fn=lambda x: self.dataset.collate_func(x, split),
                 drop_last=False,
             )
+            #
+            # Generate iterator over given data set split ()
             self.iters[split] = iter(self.loaders[split])
 
     def get_batch(self, split):
@@ -60,6 +67,7 @@ class DataLoader:
         return data
 
     def reset_iterator(self, split):
+        """Point iterator to beginning"""
         self.loaders[split].sampler._reset_iter()
         self.iters[split] = iter(self.loaders[split])
 
@@ -95,7 +103,11 @@ class DataLoader:
         }
 
     def load_state_dict(self, state_dict=None):
+        #
+        # Not sure why you would ever call this with state_dict==None?
         if state_dict is None:
             return
+        #
+        # 
         for split in self.loaders.keys():
             self.loaders[split].sampler.load_state_dict(state_dict[split])

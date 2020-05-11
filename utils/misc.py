@@ -1,6 +1,8 @@
 from copy import deepcopy
 from torch.nn import ModuleList
 from torch import is_tensor
+from six import PY3
+from six.moves import cPickle
 
 
 def clones(module, N):
@@ -20,3 +22,25 @@ def repeat_tensors(n, x):
     elif type(x) is list or type(x) is tuple:
         x = [repeat_tensors(n, _) for _ in x]
     return x
+
+
+def pickle_load(f):
+    """ Load a pickle.
+    Parameters
+    ----------
+    f: file-like object
+    """
+    if PY3:
+        return cPickle.load(f, encoding="latin-1")
+    else:
+        return cPickle.load(f)
+
+
+def set_lr(optimizer, lr):
+    for group in optimizer.param_groups:
+        group["lr"] = lr
+
+
+def get_lr(optimizer):
+    for group in optimizer.param_groups:
+        return group["lr"]

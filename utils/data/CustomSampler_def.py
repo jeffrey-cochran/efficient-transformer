@@ -6,23 +6,33 @@ class CustomSampler(data.sampler.Sampler):
     def __init__(self, index_list, shuffle, wrap):
         self.index_list = index_list
         self.shuffle = shuffle
+        #
+        # if(wrap) ==> do not call StopIteration exception
+        # wrap==True used during training, and wrap==False used during test.
         self.wrap = wrap
-        # if wrap, there will be not stop iteration called
-        # wrap True used during training, and wrap False used during test.
         self._reset_iter()
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        
         wrapped = False
+
+        #
+        # Check whether exhausted indices
         if self.iter_counter == len(self._index_list):
             self._reset_iter()
+            #
+            # Wrap around to form new batch if training
             if self.wrap:
                 wrapped = True
             else:
                 raise StopIteration()
+        #
+        # elem = ( [batch_indices,], current_iteration, has_wrapped )
         elem = (self._index_list[self.iter_counter], self.iter_counter + 1, wrapped)
+        #
         self.iter_counter += 1
         return elem
 
@@ -30,8 +40,13 @@ class CustomSampler(data.sampler.Sampler):
         return self.__next__()
 
     def _reset_iter(self):
+        #
+        # Reshuffle indices
         if self.shuffle:
             rand_perm = npr.permutation(len(self.index_list))
+
+            #
+            # _index_list is just shuffled index_list here
             self._index_list = [self.index_list[_] for _ in rand_perm]
         else:
             self._index_list = self.index_list

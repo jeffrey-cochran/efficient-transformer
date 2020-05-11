@@ -13,6 +13,11 @@ batch_size: 10
 learning_rate: 0.0005
 
 #
+# Preprocessing configs
+resnet_fully_connected_feature_size: 2048
+resnet_conv_feature_size: 2048
+
+#
 # Transformer configs
 label_smoothing: 0.0
 N_enc: 6
