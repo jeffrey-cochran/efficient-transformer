@@ -21,7 +21,7 @@ import sys
 
 #
 # Local imports
-from utils.constants import bad_endings
+from utils.constants import bad_endings, IMAGE_ROOT
 
 #
 # Load coco-caption if available
@@ -73,72 +73,88 @@ def count_bad(sen):
 #
 # Load annotation file
 def getCOCO(dataset):
-    if "coco" in dataset:
-        annFile = "coco-caption/annotations/captions_val2014.json"
-    elif "flickr30k" in dataset or "f30k" in dataset:
-        annFile = "data/f30k_captions4eval.json"
+    annFile = "coco-caption/annotations/captions_val2014.json"
     return COCO(annFile)
 
 
-def language_eval(dataset, preds, preds_n, eval_kwargs, split):
-    model_id = eval_kwargs["id"]
-    eval_oracle = eval_kwargs.get("eval_oracle", 0)
+def language_eval(dataset, preds, preds_n, job_id, split, eval_oracle=False):
 
+    #
     # create output dictionary
     out = {}
 
-    if len(preds_n) > 0:
-        # vocab size and novel sentences
-        if "coco" in dataset:
-            dataset_file = "data/dataset_coco.json"
-        elif "flickr30k" in dataset or "f30k" in dataset:
-            dataset_file = "data/dataset_flickr30k.json"
-        training_sentences = set(
-            [
-                " ".join(__["tokens"])
-                for _ in json.load(open(dataset_file))["images"]
-                if not _["split"] in ["val", "test"]
-                for __ in _["sentences"]
-            ]
-        )
-        generated_sentences = set([_["caption"] for _ in preds_n])
-        novels = generated_sentences - training_sentences
-        out["novel_sentences"] = float(len(novels)) / len(preds_n)
-        tmp = [_.split() for _ in generated_sentences]
-        words = []
-        for _ in tmp:
-            words += _
-        out["vocab_size"] = len(set(words))
+    #
+    # Diversity not implemented
+    # ===========
+    # if len(preds_n) > 0:
+    #     # vocab size and novel sentences
+    #     if "coco" in dataset:
+    #         dataset_file = "data/dataset_coco.json"
+    #     elif "flickr30k" in dataset or "f30k" in dataset:
+    #         dataset_file = "data/dataset_flickr30k.json"
+    #     training_sentences = set(
+    #         [
+    #             " ".join(__["tokens"])
+    #             for _ in json.load(open(dataset_file))["images"]
+    #             if not _["split"] in ["val", "test"]
+    #             for __ in _["sentences"]
+    #         ]
+    #     )
+    #     generated_sentences = set([_["caption"] for _ in preds_n])
+    #     novels = generated_sentences - training_sentences
+    #     out["novel_sentences"] = float(len(novels)) / len(preds_n)
+    #     tmp = [_.split() for _ in generated_sentences]
+    #     words = []
+    #     for _ in tmp:
+    #         words += _
+    #     out["vocab_size"] = len(set(words))
 
-    # encoder.FLOAT_REPR = lambda o: format(o, '.3f')
+    #
+    # Set cache path
+    cache_path = os.path.join("eval_results/", f".cache_{job_id}_{split}.json")
 
-    cache_path = os.path.join(
-        "eval_results/", ".cache_" + model_id + "_" + split + ".json"
-    )
-
+    #
+    # Extract image ids in current data set
     coco = getCOCO(dataset)
-    valids = coco.getImgIds()
+    image_ids = coco.getImgIds()
 
-    # filter results to only those in MSCOCO validation set
-    preds_filt = [p for p in preds if p["image_id"] in valids]
-    mean_perplexity = sum([_["perplexity"] for _ in preds_filt]) / len(preds_filt)
-    mean_entropy = sum([_["entropy"] for _ in preds_filt]) / len(preds_filt)
-    print("using %d/%d predictions" % (len(preds_filt), len(preds)))
+    #
+    # Filter results to only those in MSCOCO validation set
+    filtered_predictions = [p for p in preds if p["image_id"] in image_ids]
+    num_filtered_predictions = float(len(filtered_predictions))
+    num_predictions = float(len(preds))
+
+    #
+    # Save predictions
+    mean_perplexity = (
+        sum([p["perplexity"] for p in filtered_predictions]) / num_filtered_predictions
+    )
+    mean_entropy = (
+        sum([p["entropy"] for p in filtered_predictions]) / num_filtered_predictions
+    )
+    print(f"using {num_filtered_predictions}/{num_predictions} predictions")
     json.dump(
-        preds_filt, open(cache_path, "w")
+        filtered_predictions, open(cache_path, "w")
     )  # serialize to temporary json file. Sigh, COCO API...
 
+    #
+    # Evaluate captions
+    # NOTE: loadRes() API call requires a json file, hence the above comment
     cocoRes = coco.loadRes(cache_path)
     cocoEval = COCOEvalCap(coco, cocoRes)
     cocoEval.params["image_id"] = cocoRes.getImgIds()
     cocoEval.evaluate()
 
-    for metric, score in cocoEval.eval.items():
-        out[metric] = score
-    # Add mean perplexity
+    #
+    # Compile results so far
     out["perplexity"] = mean_perplexity
     out["entropy"] = mean_entropy
+    #
+    for metric, score in cocoEval.eval.items():
+        out[metric] = score
 
+    #
+    # Record SPICE scores??
     imgToEval = cocoEval.imgToEval
     for k in list(imgToEval.values())[0]["SPICE"].keys():
         if k != "All":
@@ -148,45 +164,55 @@ def language_eval(dataset, preds, preds_n, eval_kwargs, split):
             out["SPICE_" + k] = (
                 out["SPICE_" + k][out["SPICE_" + k] == out["SPICE_" + k]]
             ).mean()
-    for p in preds_filt:
+    #
+    # Overwrite caption or set?
+    for p in filtered_predictions:
         image_id, caption = p["image_id"], p["caption"]
         imgToEval[image_id]["caption"] = caption
 
-    if len(preds_n) > 0:
-        import eval_multi
+    #
+    # Diverse sampling not implemented
+    # ==================
+    # if len(preds_n) > 0:
+    #     import eval_multi
 
-        cache_path_n = os.path.join(
-            "eval_results/", ".cache_" + model_id + "_" + split + "_n.json"
-        )
-        allspice = eval_multi.eval_allspice(dataset, preds_n, model_id, split)
-        out.update(allspice["overall"])
-        div_stats = eval_multi.eval_div_stats(dataset, preds_n, model_id, split)
-        out.update(div_stats["overall"])
-        if eval_oracle:
-            oracle = eval_multi.eval_oracle(dataset, preds_n, model_id, split)
-            out.update(oracle["overall"])
-        else:
-            oracle = None
-        self_cider = eval_multi.eval_self_cider(dataset, preds_n, model_id, split)
-        out.update(self_cider["overall"])
-        with open(cache_path_n, "w") as outfile:
-            json.dump(
-                {
-                    "allspice": allspice,
-                    "div_stats": div_stats,
-                    "oracle": oracle,
-                    "self_cider": self_cider,
-                },
-                outfile,
-            )
+    #     cache_path_n = os.path.join(
+    #         "eval_results/", ".cache_" + job_id + "_" + split + "_n.json"
+    #     )
+    #     allspice = eval_multi.eval_allspice(dataset, preds_n, job_id, split)
+    #     out.update(allspice["overall"])
+    #     div_stats = eval_multi.eval_div_stats(dataset, preds_n, job_id, split)
+    #     out.update(div_stats["overall"])
+    #     if eval_oracle:
+    #         oracle = eval_multi.eval_oracle(dataset, preds_n, job_id, split)
+    #         out.update(oracle["overall"])
+    #     else:
+    #         oracle = None
+    #     self_cider = eval_multi.eval_self_cider(dataset, preds_n, job_id, split)
+    #     out.update(self_cider["overall"])
+    #     with open(cache_path_n, "w") as outfile:
+    #         json.dump(
+    #             {
+    #                 "allspice": allspice,
+    #                 "div_stats": div_stats,
+    #                 "oracle": oracle,
+    #                 "self_cider": self_cider,
+    #             },
+    #             outfile,
+    #         )
 
-    out["bad_count_rate"] = sum([count_bad(_["caption"]) for _ in preds_filt]) / float(
-        len(preds_filt)
-    )
-    outfile_path = os.path.join("eval_results/", model_id + "_" + split + ".json")
+    #
+    # Fraction of captions that have illegal endings
+    # SEE: bad_endings in /utils/constants.py
+    num_bad_endings = sum([count_bad(_["caption"]) for _ in filtered_predictions])
+    out["bad_count_rate"] = num_bad_endings / num_filtered_predictions
+
+    #
+    # Write evaluation results to json
+    outfile_path = os.path.join("eval_results/", f"{job_id}_{split}.json")
     with open(outfile_path, "w") as outfile:
         json.dump({"overall": out, "imgToEval": imgToEval}, outfile)
-
+    #
     return out
 
 
@@ -204,6 +230,9 @@ def eval_split(
     beam_size=1,
     sample_n=1,
     remove_bad_endings=False,
+    dump_path=False,
+    dump_images=False,
+    job_id="FUN_TIME",
 ):
     #
     # Use this nasty way to make other code clean since it's a global configuration
@@ -285,16 +314,18 @@ def eval_split(
                 print(
                     "\n".join(
                         [
-                            utils.decode_sequence(
-                                loader.get_vocab(), _["seq"].unsqueeze(0)
-                            )[0]
+                            decode_sequence(loader.get_vocab(), _["seq"].unsqueeze(0))[
+                                0
+                            ]
                             for _ in model.done_beams[i]
                         ]
                     )
                 )
                 print("--" * 10)
-        sents = utils.decode_sequence(loader.get_vocab(), seq)
+        sents = decode_sequence(loader.get_vocab(), seq)
 
+        #
+        # Iterate over generated sentences
         for k, sent in enumerate(sents):
             entry = {
                 "image_id": data["infos"][k]["id"],
@@ -302,66 +333,74 @@ def eval_split(
                 "perplexity": perplexity[k].item(),
                 "entropy": entropy[k].item(),
             }
-            if eval_kwargs.get("dump_path", 0) == 1:
+            if dump_path:
                 entry["file_name"] = data["infos"][k]["file_path"]
             predictions.append(entry)
-            if eval_kwargs.get("dump_images", 0) == 1:
-                # dump the raw image to vis/ folder
-                cmd = (
-                    'cp "'
-                    + os.path.join(
-                        eval_kwargs["image_root"], data["infos"][k]["file_path"]
-                    )
-                    + '" vis/imgs/img'
-                    + str(len(predictions))
-                    + ".jpg"
-                )  # bit gross
-                print(cmd)
+            if dump_images:
+                #
+                # Dump the raw image to vis/ folder
+                img_path_k = os.path.join(IMAGE_ROOT, data["infos"][k]["file_path"])
+                img_destination_k = f"vis/imgs/{len(predictions)}.jpg"
+                cmd = f'cp "{img_path_k}" {img_destination_k}'  # bit gross
+                print(f"COPYING IMAGES......{cmd}")
                 os.system(cmd)
 
             if verbose:
-                print("image %s: %s" % (entry["image_id"], entry["caption"]))
+                print(f'image {entry["image_id"]}: {entry["caption"]}')
 
-        if sample_n > 1:
-            eval_split_n(
-                model,
-                n_predictions,
-                loader,
-                [fc_feats, att_feats, att_masks, data],
-                eval_kwargs,
-            )
+        #
+        # Diverse sampling not implemented
+        # ==================
+        # if sample_n > 1:
+        #     eval_split_n(
+        #         model,
+        #         n_predictions,
+        #         loader,
+        #         [fc_feats, att_feats, att_masks, data],
+        #         eval_kwargs,
+        #     )
 
-        ix0 = data["bounds"]["it_pos_now"]
-        ix1 = data["bounds"]["it_max"]
+        #
+        # Iterator position over images
+        current_image_index = data["bounds"]["it_pos_now"]
+        num_images_evaluate = data["bounds"]["it_max"]
         if num_images != -1:
-            ix1 = min(ix1, num_images)
+            num_images_evaluate = min(num_images_evaluate, num_images)
         else:
-            num_images = ix1
-        for i in range(n - ix1):
+            num_images = num_images_evaluate
+
+        #
+        # This seems toatlly unnecessary...
+        for i in range(n - num_images_evaluate):
             predictions.pop()
 
         if verbose:
             print(
-                "evaluating validation preformance... %d/%d (%f)" % (ix0 - 1, ix1, loss)
+                f"evaluating validation preformance... {current_image_index-1}/{num_images_evaluate} ({loss})"
             )
 
         if num_images >= 0 and n >= num_images:
             break
 
-    lang_stats = None
-    if len(n_predictions) > 0 and "perplexity" in n_predictions[0]:
-        n_predictions = sorted(n_predictions, key=lambda x: x["perplexity"])
+    #
+    # DIVERSITY NOT IMPLEMENTED
+    # ===============
+    # if len(n_predictions) > 0 and "perplexity" in n_predictions[0]:
+    #     n_predictions = sorted(n_predictions, key=lambda x: x["perplexity"])
+
+    #
+    # Save eval results
     if not os.path.isdir("eval_results"):
         os.mkdir("eval_results")
+    #
     torch.save(
         (predictions, n_predictions),
-        os.path.join(
-            "eval_results/", ".saved_pred_" + eval_kwargs["id"] + "_" + split + ".pth"
-        ),
+        os.path.join("eval_results/", f".saved_pred_{job_id}_{split}.pth"),
     )
+    lang_stats = None
     if lang_eval == 1:
         lang_stats = language_eval(
-            dataset, predictions, n_predictions, eval_kwargs, split
+            dataset, predictions, n_predictions, job_id, split, eval_oracle=False
         )
 
     # Switch back to training mode
@@ -370,92 +409,92 @@ def eval_split(
 
 
 # Only run when sample_n > 0
-def eval_split_n(model, n_predictions, loader, input_data, eval_kwargs={}):
-    verbose = eval_kwargs.get("verbose", True)
-    beam_size = eval_kwargs.get("beam_size", 1)
-    sample_n = eval_kwargs.get("sample_n", 1)
-    sample_n_method = eval_kwargs.get("sample_n_method", "sample")
+# def eval_split_n(model, n_predictions, loader, input_data, eval_kwargs={}):
+#     verbose = eval_kwargs.get("verbose", True)
+#     beam_size = eval_kwargs.get("beam_size", 1)
+#     sample_n = eval_kwargs.get("sample_n", 1)
+#     sample_n_method = eval_kwargs.get("sample_n_method", "sample")
 
-    fc_feats, att_feats, att_masks, data = input_data
+#     fc_feats, att_feats, att_masks, data = input_data
 
-    tmp_eval_kwargs = eval_kwargs.copy()
-    if sample_n_method == "bs":
-        # case 1 sample_n == beam size
-        tmp_eval_kwargs.update(
-            {"sample_n": 1, "beam_size": sample_n, "group_size": 1}
-        )  # randomness from softmax
-        with torch.no_grad():
-            model(fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample")
-        for k in range(loader.batch_size):
-            _sents = utils.decode_sequence(
-                loader.get_vocab(),
-                torch.stack([model.done_beams[k][_]["seq"] for _ in range(sample_n)]),
-            )
-            for sent in _sents:
-                entry = {"image_id": data["infos"][k]["id"], "caption": sent}
-                n_predictions.append(entry)
-    # case 2 sample / gumbel / topk sampling/ nucleus sampling
-    elif (
-        sample_n_method == "sample"
-        or sample_n_method == "gumbel"
-        or sample_n_method.startswith("top")
-    ):
-        tmp_eval_kwargs.update(
-            {"sample_n": sample_n, "sample_method": sample_n_method, "beam_size": 1}
-        )  # randomness from sample
-        with torch.no_grad():
-            _seq, _sampleLogprobs = model(
-                fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample"
-            )
-        _sents = utils.decode_sequence(loader.get_vocab(), _seq)
-        _perplexity = -_sampleLogprobs.gather(2, _seq.unsqueeze(2)).squeeze(2).sum(
-            1
-        ) / ((_seq > 0).float().sum(1) + 1)
-        for k, sent in enumerate(_sents):
-            entry = {
-                "image_id": data["infos"][k // sample_n]["id"],
-                "caption": sent,
-                "perplexity": _perplexity[k].item(),
-            }
-            n_predictions.append(entry)
-    elif sample_n_method == "dbs":
-        # Use diverse beam search
-        tmp_eval_kwargs.update(
-            {"beam_size": sample_n * beam_size, "group_size": sample_n}
-        )  # randomness from softmax
-        with torch.no_grad():
-            model(fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample")
-        for k in range(loader.batch_size):
-            _sents = utils.decode_sequence(
-                loader.get_vocab(),
-                torch.stack(
-                    [
-                        model.done_beams[k][_]["seq"]
-                        for _ in range(0, sample_n * beam_size, beam_size)
-                    ]
-                ),
-            )
-            for sent in _sents:
-                entry = {"image_id": data["infos"][k]["id"], "caption": sent}
-                n_predictions.append(entry)
-    else:
-        tmp_eval_kwargs.update(
-            {
-                "sample_method": sample_n_method[1:],
-                "group_size": sample_n,
-                "beam_size": 1,
-            }
-        )  # randomness from softmax
-        with torch.no_grad():
-            _seq, _sampleLogprobs = model(
-                fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample"
-            )
-        _sents = utils.decode_sequence(loader.get_vocab(), _seq)
-        for k, sent in enumerate(_sents):
-            entry = {"image_id": data["infos"][k // sample_n]["id"], "caption": sent}
-            n_predictions.append(entry)
-    if verbose:
-        for entry in sorted(
-            n_predictions[-loader.batch_size * sample_n :], key=lambda x: x["image_id"]
-        ):
-            print("image %s: %s" % (entry["image_id"], entry["caption"]))
+#     tmp_eval_kwargs = eval_kwargs.copy()
+#     if sample_n_method == "bs":
+#         # case 1 sample_n == beam size
+#         tmp_eval_kwargs.update(
+#             {"sample_n": 1, "beam_size": sample_n, "group_size": 1}
+#         )  # randomness from softmax
+#         with torch.no_grad():
+#             model(fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample")
+#         for k in range(loader.batch_size):
+#             _sents = utils.decode_sequence(
+#                 loader.get_vocab(),
+#                 torch.stack([model.done_beams[k][_]["seq"] for _ in range(sample_n)]),
+#             )
+#             for sent in _sents:
+#                 entry = {"image_id": data["infos"][k]["id"], "caption": sent}
+#                 n_predictions.append(entry)
+#     # case 2 sample / gumbel / topk sampling/ nucleus sampling
+#     elif (
+#         sample_n_method == "sample"
+#         or sample_n_method == "gumbel"
+#         or sample_n_method.startswith("top")
+#     ):
+#         tmp_eval_kwargs.update(
+#             {"sample_n": sample_n, "sample_method": sample_n_method, "beam_size": 1}
+#         )  # randomness from sample
+#         with torch.no_grad():
+#             _seq, _sampleLogprobs = model(
+#                 fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample"
+#             )
+#         _sents = utils.decode_sequence(loader.get_vocab(), _seq)
+#         _perplexity = -_sampleLogprobs.gather(2, _seq.unsqueeze(2)).squeeze(2).sum(
+#             1
+#         ) / ((_seq > 0).float().sum(1) + 1)
+#         for k, sent in enumerate(_sents):
+#             entry = {
+#                 "image_id": data["infos"][k // sample_n]["id"],
+#                 "caption": sent,
+#                 "perplexity": _perplexity[k].item(),
+#             }
+#             n_predictions.append(entry)
+#     elif sample_n_method == "dbs":
+#         # Use diverse beam search
+#         tmp_eval_kwargs.update(
+#             {"beam_size": sample_n * beam_size, "group_size": sample_n}
+#         )  # randomness from softmax
+#         with torch.no_grad():
+#             model(fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample")
+#         for k in range(loader.batch_size):
+#             _sents = utils.decode_sequence(
+#                 loader.get_vocab(),
+#                 torch.stack(
+#                     [
+#                         model.done_beams[k][_]["seq"]
+#                         for _ in range(0, sample_n * beam_size, beam_size)
+#                     ]
+#                 ),
+#             )
+#             for sent in _sents:
+#                 entry = {"image_id": data["infos"][k]["id"], "caption": sent}
+#                 n_predictions.append(entry)
+#     else:
+#         tmp_eval_kwargs.update(
+#             {
+#                 "sample_method": sample_n_method[1:],
+#                 "group_size": sample_n,
+#                 "beam_size": 1,
+#             }
+#         )  # randomness from softmax
+#         with torch.no_grad():
+#             _seq, _sampleLogprobs = model(
+#                 fc_feats, att_feats, att_masks, opt=tmp_eval_kwargs, mode="sample"
+#             )
+#         _sents = utils.decode_sequence(loader.get_vocab(), _seq)
+#         for k, sent in enumerate(_sents):
+#             entry = {"image_id": data["infos"][k // sample_n]["id"], "caption": sent}
+#             n_predictions.append(entry)
+#     if verbose:
+#         for entry in sorted(
+#             n_predictions[-loader.batch_size * sample_n :], key=lambda x: x["image_id"]
+#         ):
+#             print("image %s: %s" % (entry["image_id"], entry["caption"]))

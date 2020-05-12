@@ -1,4 +1,5 @@
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
+from os import getenv
 
 #
 # Default Paths
@@ -7,6 +8,7 @@ input_fc_dir = ""
 input_att_dir = ""
 input_box_dir = ""
 input_label_h5 = ""
+IMAGE_ROOT = getenv("IMAGE_ROOT")
 
 #
 # Optimization types

@@ -41,4 +41,4 @@ def build_optimizer(
             weight_decay=weight_decay,
         )
     else:
-        raise Exception("Incorrect optimizerization option")
+        raise Exception("Incorrect optimization option")

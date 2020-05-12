@@ -33,6 +33,7 @@ from utils.data.DataLoader_def import DataLoader
 from utils.data.Dataset_def import Dataset
 from utils.data.HybridLoader_def import HybridLoader
 from utils.data.CustomSampler_def import CustomSampler
+from utils.evaluation import eval_split
 from utils.loss.LossWrapper_def import LossWrapper
 from utils.loss.rewards import init_scorer
 from utils.misc import pickle_load
@@ -419,13 +420,29 @@ def train(
                 iteration % save_checkpoint_iterations == 0 and not save_every_epoch
             ) or (epoch_done and save_every_epoch):
                 #
-                # Eval model
+                # Evaluate model on Validation set of COCO
                 eval_kwargs = {"split": "val", "dataset": input_json_file_name}
-                eval_kwargs.update(vars(opt))
-                val_loss, predictions, lang_stats = utils.evaluation.eval_split(
-                    dp_model, lw_model.crit, loader, eval_kwargs
+                val_loss, predictions, lang_stats = eval_split(
+                    dp_model,
+                    lw_model.crit,
+                    loader,
+                    verbose=True,
+                    verbose_beam=False,
+                    verbose_loss=True,
+                    num_images=-1,
+                    split="val",
+                    lang_eval=False,
+                    dataset="coco",
+                    beam_size=1,
+                    sample_n=1,
+                    remove_bad_endings=False,
+                    dump_path=False,
+                    dump_images=False,
+                    job_id="FUN_TIME",
                 )
 
+                #
+                # Reduces learning rate if no improvement in objective
                 if optimizer_type == REDUCE_LR:
                     if "CIDEr" in lang_stats:
                         optimizer.scheduler_step(-lang_stats["CIDEr"])
