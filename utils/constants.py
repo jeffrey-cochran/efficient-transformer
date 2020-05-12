@@ -53,3 +53,6 @@ BEAM = "beam_search"
 # Types of structure loss
 SOFTMAX = "softmax_margin"
 MARGIN_KEYWORD = "margin"
+
+#
+# Aesthetic

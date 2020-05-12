@@ -105,3 +105,7 @@ def save_checkpoint(
     if histories is not None:
         with open(histories_path, "wb") as f:
             pickle_dump(histories, f)
+
+
+def BAR(bar_character, bar_length):
+    return f"\n{bar_character * bar_length}\n"

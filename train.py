@@ -14,7 +14,7 @@ import numpy as np
 import time
 from os.path import join, isfile
 from six.moves import cPickle
-import traceback
+from traceback import format_exc
 from collections import defaultdict
 
 
@@ -36,7 +36,7 @@ from utils.data.CustomSampler_def import CustomSampler
 from utils.evaluation import eval_split
 from utils.loss.LossWrapper_def import LossWrapper
 from utils.loss.rewards import init_scorer
-from utils.misc import pickle_load
+from utils.misc import pickle_load, save_checkpoint, BAR
 from utils.optimization.NoamOpt_def import NoamOpt, get_std_opt
 from utils.optimization.ReduceLROnPlateau_def import ReduceLROnPlateau
 from utils.optimization import build_optimizer
@@ -81,6 +81,7 @@ def train(
     log_loss_iterations=25,
     save_every_epoch=True,
     save_checkpoint_iterations=3000,
+    save_history_ckpt=True,
     eval_language_model=True,
 ):
 
@@ -480,25 +481,40 @@ def train(
                 infos["best_val_score"] = best_val_score
 
                 #
-                # Checkpoint
-                utils.save_checkpoint(opt, model, infos, optimizer, histories)
-                if opt.save_history_ckpt:
-                    utils.save_checkpoint(
-                        opt,
+                # Save checkpoints...seems only most recent one keep histories,
+                # and it's overwritten each time
+                save_checkpoint(
+                    model,
+                    infos,
+                    optimizer,
+                    checkpoint_dir=checkpoint_path,
+                    histories=histories,
+                    append="RECENT",
+                )
+                if save_history_ckpt:
+                    save_checkpoint(
                         model,
                         infos,
                         optimizer,
-                        append=str(epoch) if opt.save_every_epoch else str(iteration),
+                        checkpoint_dir=checkpoint_path,
+                        append=str(epoch) if save_every_epoch else str(iteration),
+                    )
+                if best_flag:
+                    save_checkpoint(
+                        model,
+                        infos,
+                        optimizer,
+                        checkpoint_dir=checkpoint_path,
+                        append="BEST",
                     )
 
-                if best_flag:
-                    utils.save_checkpoint(opt, model, infos, optimizer, append="best")
-
     except (RuntimeError, KeyboardInterrupt):
-        print("Save ckpt on exception ...")
-        utils.save_checkpoint(opt, model, infos, optimizer)
-        print("Save ckpt done.")
-        stack_trace = traceback.format_exc()
+        print(f'{BAR("=", 20)}Save checkpoint on exception...')
+        save_checkpoint(
+            model, infos, optimizer, checkpoint_dir=checkpoint_path, append="EXCEPTION"
+        )
+        print(f'...checkpoint saved.{BAR("=", 20)}')
+        stack_trace = format_exc()
         print(stack_trace)
 
 
