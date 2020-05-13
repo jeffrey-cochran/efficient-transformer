@@ -4,8 +4,8 @@ from os import getenv
 #
 # Default Paths
 checkpoint_path = ""
-input_fc_dir = ""
-input_att_dir = ""
+input_fc_dir = "data/cocotalk_fc"
+input_att_dir = "data/cocotalk_att"
 input_box_dir = ""
 input_label_h5 = ""
 IMAGE_ROOT = getenv("IMAGE_ROOT")

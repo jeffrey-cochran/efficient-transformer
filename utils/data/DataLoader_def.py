@@ -35,6 +35,7 @@ class DataLoader:
             #
             # Shuffle data for training
             if split == "train":
+                
                 sampler = CustomSampler(
                     self.dataset.split_ix[split], shuffle=True, wrap=True
                 )

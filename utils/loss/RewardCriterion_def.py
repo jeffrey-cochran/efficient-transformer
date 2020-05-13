@@ -7,6 +7,8 @@ class RewardCriterion(Module):
         super(RewardCriterion, self).__init__()
 
     def forward(self, input, seq, reward):
+        print(f"INPUT")
+
         input = input.gather(2, seq.unsqueeze(2)).squeeze(2)
 
         input = input.reshape(-1)

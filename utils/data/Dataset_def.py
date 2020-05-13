@@ -232,13 +232,15 @@ class Dataset(data.Dataset):
             data["att_masks"] = None
 
         data["labels"] = np_vstack(label_batch)
+        #
         # generate mask
-        nonzeros = np_vstack(list(map(lambda x: (x != 0).sum() + 2, data["labels"])))
+        nonzeros = np_array(list(map(lambda x: (x != 0).sum() + 2, data["labels"])))
         mask_batch = np_zeros(
             [data["labels"].shape[0], self.max_seq_length + 2], dtype="float32"
         )
         for ix, row in enumerate(mask_batch):
             row[: nonzeros[ix]] = 1
+            
         data["masks"] = mask_batch
         data["labels"] = data["labels"].reshape(
             len(batch), necessary_num_img_captions, -1

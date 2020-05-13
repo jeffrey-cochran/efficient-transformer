@@ -298,6 +298,8 @@ def train(
             optimizer.zero_grad()
 
             #
+            print("MADE IT TO THE MODEL EVALUATION")
+            #
             # Evaluate model
             model_out = dp_lw_model(
                 fc_feats,
